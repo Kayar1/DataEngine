@@ -1,8 +1,16 @@
--- =====================================================================
--- TASK 5 — starred_repos_without_push (12 балів). Специфікація: ../../MODELS.md → «starred_repos_without_push».
--- Репозиторії зі зіркою (WatchEvent), але без жодного PushEvent: anti-join (NOT EXISTS).
--- Контракт колонок нижче; заглушка повертає 0 рядків.
--- =====================================================================
+WITH watched_repos AS (
+    SELECT DISTINCT repo_name
+    FROM {{ ref('stg_events') }}
+    WHERE event_type = 'WatchEvent'
+)
+
 SELECT
-    NULL::VARCHAR AS repo_name
-WHERE false  -- TODO: репо з WatchEvent мінус репо, що мають PushEvent, у stg_events
+    w.repo_name
+FROM watched_repos AS w
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM {{ ref('stg_events') }} AS s
+    WHERE s.repo_name = w.repo_name
+      AND s.event_type = 'PushEvent'
+)
+ORDER BY repo_name
