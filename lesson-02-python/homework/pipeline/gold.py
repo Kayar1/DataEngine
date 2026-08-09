@@ -16,6 +16,7 @@ import polars as pl
 
 from . import config
 
+<<<<<<< Updated upstream
 import os
 
 def build_repo_activity(silver: pl.DataFrame) -> pl.DataFrame:
@@ -24,6 +25,16 @@ def build_repo_activity(silver: pl.DataFrame) -> pl.DataFrame:
     if not os.path.exists(GOLD_REPO_ACTIVITY_DIR):
         os.makedirs(GOLD_REPO_ACTIVITY_DIR)
 
+=======
+from . import config
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+def build_repo_activity(silver: pl.DataFrame) -> pl.DataFrame:
+
+>>>>>>> Stashed changes
     df = (silver
         .group_by("repo_name")
         .agg(
@@ -35,17 +46,26 @@ def build_repo_activity(silver: pl.DataFrame) -> pl.DataFrame:
         .sort("event_count", descending=True)
     )
     
+<<<<<<< Updated upstream
     print(f"Gold 1 table {df}")
 
     df.write_parquet(config.GOLD_REPO_ACTIVITY, compression="zstd",)
+=======
+    logger.info(f"Gold 1 table {df}")
+
+    df.write_parquet(config.GOLD_REPO_ACTIVITY, compression="zstd", mkdir=True)
+>>>>>>> Stashed changes
 
 
 def build_activity_per_minute(silver: pl.DataFrame) -> pl.DataFrame:
     
+<<<<<<< Updated upstream
     GOLD_ACTIVITY_PER_MINUTE_DIR = os.path.dirname(config.GOLD_ACTIVITY_PER_MINUTE)
     if not os.path.exists(GOLD_ACTIVITY_PER_MINUTE_DIR):
         os.makedirs(GOLD_ACTIVITY_PER_MINUTE_DIR)
 
+=======
+>>>>>>> Stashed changes
     df = (silver
         .with_columns(
             pl.col("created_at")
@@ -60,17 +80,26 @@ def build_activity_per_minute(silver: pl.DataFrame) -> pl.DataFrame:
         .sort("minute", descending=False)
     )
     
+<<<<<<< Updated upstream
     print(f"Gold 2 table {df}")
 
     df.write_parquet(config.GOLD_ACTIVITY_PER_MINUTE, compression="zstd",)
+=======
+    logger.info(f"Gold 2 table {df}")
+
+    df.write_parquet(config.GOLD_ACTIVITY_PER_MINUTE, compression="zstd", mkdir=True)
+>>>>>>> Stashed changes
 
 
 def build_push_commits_by_repo(silver: pl.DataFrame) -> pl.DataFrame:
     
+<<<<<<< Updated upstream
     GOLD_PUSH_COMMITS_DIR = os.path.dirname(config.GOLD_PUSH_COMMITS)
     if not os.path.exists(GOLD_PUSH_COMMITS_DIR):
         os.makedirs(GOLD_PUSH_COMMITS_DIR)
 
+=======
+>>>>>>> Stashed changes
     df = (silver
         .filter(pl.col("event_type") == "PushEvent")
         .group_by("repo_name")
@@ -83,6 +112,12 @@ def build_push_commits_by_repo(silver: pl.DataFrame) -> pl.DataFrame:
         .sort("total_commits", descending=True)
     )
         
+<<<<<<< Updated upstream
     print(f"Gold 3 table {df}")
 
     df.write_parquet(config.GOLD_PUSH_COMMITS, compression="zstd",)
+=======
+    logger.info(f"Gold 3 table {df}")
+
+    df.write_parquet(config.GOLD_PUSH_COMMITS, compression="zstd", mkdir=True)
+>>>>>>> Stashed changes

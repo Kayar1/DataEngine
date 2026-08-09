@@ -21,6 +21,7 @@ import polars as pl
 
 from . import config
 
+<<<<<<< Updated upstream
 import os
 
 def build_silver(bronze: pl.DataFrame) -> pl.DataFrame:
@@ -43,12 +44,35 @@ def build_silver(bronze: pl.DataFrame) -> pl.DataFrame:
     print(f"Silver 1  table {df}")
 
     df.write_parquet(config.SILVER_FILE, compression="zstd",)
+=======
+import logging
+
+logger = logging.getLogger(__name__)
+
+def build_silver(bronze: pl.DataFrame) -> pl.DataFrame:
+    
+    df = (bronze.filter(
+          pl.col("event_type").is_in(config.TARGET_EVENT_TYPES)
+          )
+          .filter(
+            pl.col("repo_name").is_not_null() & 
+            pl.col("event_id").is_not_null() & 
+            pl.col("created_at").is_not_null()
+          )
+          .unique(subset=["event_id"], keep="first")
+    )
+    
+    logger.info(f"Silver 1 table {df}")
+
+    df.write_parquet(config.SILVER_FILE, compression="zstd", mkdir=True)
+>>>>>>> Stashed changes
 
     return df
 
 
 def write_silver_partitioned(silver: pl.DataFrame) -> None:
     
+<<<<<<< Updated upstream
     if not os.path.exists(config.SILVER_PARTITIONED_DIR):
         os.makedirs(config.SILVER_PARTITIONED_DIR)
     
@@ -56,4 +80,10 @@ def write_silver_partitioned(silver: pl.DataFrame) -> None:
         config.SILVER_PARTITIONED_DIR,
         partition_by="event_type",
         compression="zstd"
+=======
+    silver.write_parquet(
+        config.SILVER_PARTITIONED_DIR,
+        partition_by="event_type",
+        compression="zstd",mkdir=True
+>>>>>>> Stashed changes
     )
