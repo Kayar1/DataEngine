@@ -1,6 +1,6 @@
 """Bronze stage — read the raw NDJSON and flatten it to one wide table.
 
-TODO (Завдання 1): реалізуйте build_bronze().
+	TODO (Завдання 1): реалізуйте build_bronze().
 Контракт колонок та типів: див. CONTRACTS.md → "bronze".
 
 Підказки:
@@ -18,6 +18,59 @@ import polars as pl
 
 from . import config
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 def build_bronze() -> pl.DataFrame:
-    raise NotImplementedError("Завдання 1: реалізуйте bronze згідно з CONTRACTS.md")
+    
+    df = (
+      pl.scan_ndjson(config.LANDING_FILE, schema=config.LANDING_SCHEMA)
+      .with_columns(
+        [
+          pl.col("id").alias("event_id"),
+          pl.col("type").alias("event_type"),
+          pl.col("actor").struct.field("id").alias("actor_id"),
+          pl.col("actor").struct.field("login").alias("actor_login"),
+          pl.col("repo").struct.field("id").alias("repo_id"),
+          pl.col("repo").struct.field("name").alias("repo_name"),
+          pl.col("payload").struct.field("action").alias("action"),
+          pl.col("payload").struct.field("commits")
+          .list.len()
+          .fill_null(0)
+          .cast(pl.Int64)
+          .alias("commit_count"),                
+          pl.col("created_at")
+          .str.to_datetime(
+            format="%Y-%m-%dT%H:%M:%S%.fZ",
+            time_zone="UTC",
+            strict=True,
+        )
+        .alias("created_at"),
+        ]
+        )
+        .filter(
+          pl.col("repo_name").is_not_null()
+          & (pl.col("repo_name") != "")
+        )
+        .select(
+        [
+          "event_id",
+          "event_type",
+          "actor_id",
+          "actor_login",
+          "repo_id",
+          "repo_name",
+          "created_at",
+          "public",
+          "action",
+          "commit_count",
+        ]
+        ).collect()
+    )
+    
+    logger.info(f"Bronze table {df}")
+
+    df.write_parquet(config.BRONZE_FILE, compression="zstd", mkdir=True)
+
+    return df

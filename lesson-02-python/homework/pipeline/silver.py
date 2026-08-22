@@ -1,6 +1,6 @@
 """Silver stage — clean, filter and de-duplicate the bronze events.
 
-TODO (Завдання 2 і 3): реалізуйте build_silver() і write_silver_partitioned().
+	TODO (Завдання 2 і 3): реалізуйте build_silver() і write_silver_partitioned().
 Контракт: див. CONTRACTS.md → "silver" і "silver partitioned".
 
 build_silver():
@@ -21,10 +21,34 @@ import polars as pl
 
 from . import config
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 def build_silver(bronze: pl.DataFrame) -> pl.DataFrame:
-    raise NotImplementedError("Завдання 2: реалізуйте silver згідно з CONTRACTS.md")
+    
+    df = (bronze.filter(
+          pl.col("event_type").is_in(config.TARGET_EVENT_TYPES)
+          )
+          .filter(
+            pl.col("repo_name").is_not_null() & 
+            pl.col("event_id").is_not_null() & 
+            pl.col("created_at").is_not_null()
+          )
+          .unique(subset=["event_id"], keep="first")
+    )
+    
+    logger.info(f"Silver 1 table {df}")
+
+    df.write_parquet(config.SILVER_FILE, compression="zstd", mkdir=True)
+
+    return df
 
 
 def write_silver_partitioned(silver: pl.DataFrame) -> None:
-    raise NotImplementedError("Завдання 3: запишіть партиціонований silver за event_type")
+    
+    silver.write_parquet(
+        config.SILVER_PARTITIONED_DIR,
+        partition_by="event_type",
+        compression="zstd",mkdir=True
+    )
