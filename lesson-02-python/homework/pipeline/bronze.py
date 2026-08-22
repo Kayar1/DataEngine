@@ -13,71 +13,11 @@
 """
 
 from __future__ import annotations
-#import gzip
 
 import polars as pl
 
 from . import config
 
-<<<<<<< Updated upstream
-import os
-
-def build_bronze() -> pl.DataFrame:
-    
-    BRONZE_DIR = os.path.dirname(config.BRONZE_FILE)
-    if not os.path.exists(BRONZE_DIR):
-        os.makedirs(BRONZE_DIR)
-    
-    df = (
-        pl.scan_ndjson(config.LANDING_FILE, schema=config.LANDING_SCHEMA)
-        .with_columns(
-            [
-                pl.col("id").alias("event_id"),
-                pl.col("type").alias("event_type"),
-                
-                pl.col("actor").struct.field("id").alias("actor_id"),
-                pl.col("actor").struct.field("login").alias("actor_login"),
-
-                pl.col("repo").struct.field("id").alias("repo_id"),
-                pl.col("repo").struct.field("name").alias("repo_name"),
-
-                pl.col("payload").struct.field("action").alias("action"),
-
-                pl.col("payload").struct.field("commits")
-                .list.len()
-                .fill_null(0)
-                .cast(pl.Int64)
-                .alias("commit_count"),                
-
-                pl.col("created_at")
-                .str.to_datetime(
-                    format="%Y-%m-%dT%H:%M:%S%.fZ",
-                    time_zone="UTC",
-                    strict=False,
-                )
-                .alias("created_at"),
-            ]
-        )
-        .select(
-            [
-                "event_id",
-                "event_type",
-                "actor_id",
-                "actor_login",
-                "repo_id",
-                "repo_name",
-                "created_at",
-                "public",
-                "action",
-                "commit_count",
-            ]
-        ).collect()
-    )
-    
-    print(f"Bronze table {df}")
-
-    df.write_parquet(config.BRONZE_FILE, compression="zstd",)
-=======
 import logging
 
 logger = logging.getLogger(__name__)
@@ -132,6 +72,5 @@ def build_bronze() -> pl.DataFrame:
     logger.info(f"Bronze table {df}")
 
     df.write_parquet(config.BRONZE_FILE, compression="zstd", mkdir=True)
->>>>>>> Stashed changes
 
     return df
