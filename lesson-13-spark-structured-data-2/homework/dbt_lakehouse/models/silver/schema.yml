@@ -1,0 +1,56 @@
+version: 2
+
+# Тести на Silver. Специфікація: ../../SPEC.md → «Тести».
+# Розкоментуйте / додайте data_tests після того, як модель повертає дані.
+
+models:
+  - name: events
+    columns:
+      - name: event_id
+        tests:
+          - not_null
+          - unique
+
+      - name: event_type
+        tests:
+          - accepted_values:
+              values:
+                - PushEvent
+                - PullRequestEvent
+                - IssueCommentEvent
+                - WatchEvent
+                - IssuesEvent
+                - ForkEvent
+
+  - name: commits
+    columns:
+      - name: commit_sha
+        tests:
+          - not_null
+          - unique
+
+  - name: pull_requests
+    columns:
+      - name: pr_number
+        tests:
+          - not_null
+
+      - name: state
+        tests:
+          - accepted_values:
+              values:
+                - open
+                - closed
+
+  - name: issues
+    columns:
+      - name: issue_number
+        tests:
+          - not_null
+
+      - name: state
+        tests:
+          - accepted_values:
+              values:
+                - open
+                - closed
