@@ -1,6 +1,9 @@
 -- Тест: churn у fact_pull_request завжди = additions + deletions.
 -- Специфікація: ../../SPEC.md → «Тести». Тест падає, якщо запит поверне рядки.
--- TODO: замініть заглушку (зараз тест проходить вхолосту).
-select *
+select
+    pr_id,
+    additions,
+    deletions,
+    churn
 from {{ ref('fact_pull_request') }}
-where false
+where coalesce(churn, 0) != coalesce(additions, 0) + coalesce(deletions, 0)
