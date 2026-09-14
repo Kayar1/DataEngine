@@ -67,7 +67,7 @@ prepared as (
         is_distinct,
         pushed_at,
 
-        instr(message, '\n') > 0 as is_merge_commit,
+        starts_with(message, 'Merge ') as is_merge_commit,
 
         case
             when instr(message, '\n') > 0
