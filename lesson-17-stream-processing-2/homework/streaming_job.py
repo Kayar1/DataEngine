@@ -53,45 +53,64 @@ def build_spark() -> SparkSession:
 
 
 def event_schema() -> StructType:
-    """
-    Завдання 1 (12 балів). File source НЕ виводить схему — поверніть явний StructType
-    для подій gharchive. Потрібні поля: id (str), type (str), created_at (str),
-    public (bool), вкладені actor.login (str), repo.name (str).
-    """
-    # TODO: повернути StructType([...]) із вкладеними actor/repo
-    raise NotImplementedError
+    return StructType([
+        StructField("id", StringType(), True),
+        StructField("type", StringType(), True),
+        StructField("created_at", StringType(), True),
+        StructField("public", BooleanType(), True),
+        StructField(
+            "actor",
+            StructType([
+                StructField("login", StringType(), True),
+            ]),
+            True,
+        ),
+        StructField(
+            "repo",
+            StructType([
+                StructField("name", StringType(), True),
+            ]),
+            True,
+        ),
+    ])
 
 
 def read_stream(spark: SparkSession) -> DataFrame:
-    """
-    Завдання 2 (13 балів). Поверніть потоковий DataFrame: readStream із json-source
-    над каталогом LANDING зі схемою event_schema(). Перевірка: df.isStreaming == True.
-    """
-    # TODO: spark.readStream.schema(...).json(LANDING)
-    raise NotImplementedError
+    return (
+        spark.readStream
+        .schema(event_schema())
+        .json(LANDING)
+    )
 
 
 def clean_events(stream_df: DataFrame) -> DataFrame:
-    """
-    Завдання 3 (15 балів). Очистіть потік:
-      - лишіть тільки типи з KEEP_TYPES і публічні події (public == True);
-      - додайте колонку event_time = to_timestamp(created_at);
-      - залиште рівно колонки: id, event_type (=type), event_time,
-        actor_login (=actor.login), repo_name (=repo.name).
-    """
-    # TODO
-    raise NotImplementedError
+    return (
+        stream_df
+        .filter(
+            F.col("type").isin(KEEP_TYPES)
+            & (F.col("public") == True)
+        )
+        .withColumn("event_time", F.to_timestamp("created_at"))
+        .select(
+            F.col("id"),
+            F.col("type").alias("event_type"),
+            F.col("event_time"),
+            F.col("actor.login").alias("actor_login"),
+            F.col("repo.name").alias("repo_name"),
+        )
+    )
 
 
 def windowed_counts(clean_df: DataFrame) -> DataFrame:
-    """
-    Завдання 4 (25 балів). Tumbling window за event_time + watermark.
-    Застосуйте withWatermark(event_time, WATERMARK), згрупуйте за
-    window(event_time, WINDOW) та event_type і порахуйте count().
-    Поверніть DataFrame з колонками window (struct start/end), event_type, count.
-    """
-    # TODO
-    raise NotImplementedError
+    return (
+        clean_df
+        .withWatermark("event_time", WATERMARK)
+        .groupBy(
+            F.window("event_time", WINDOW),
+            F.col("event_type"),
+        )
+        .count()
+    )
 
 
 def write_windows(spark: SparkSession) -> None:
@@ -110,21 +129,57 @@ def write_windows(spark: SparkSession) -> None:
     clean = clean_events(read_stream(spark))
 
     def upsert_batch(batch_df: DataFrame, batch_id: int) -> None:
-        # TODO: agg = windowed_counts(batch_df); select 4 колонки; write append parquet -> OUTPUT
-        raise NotImplementedError
+        agg = windowed_counts(batch_df)
 
-    # TODO: clean.writeStream.foreachBatch(upsert_batch).option(...).trigger(...).start() та awaitTermination()
-    raise NotImplementedError
+        (
+            agg
+            .select(
+                F.col("window.start").alias("window_start"),
+                F.col("window.end").alias("window_end"),
+                F.col("event_type"),
+                F.col("count").alias("event_count"),
+            )
+            .write
+            .mode("append")
+            .parquet(OUTPUT)
+        )
+
+    (
+        clean.writeStream
+        .foreachBatch(upsert_batch)
+        .option("checkpointLocation", CHECKPOINT)
+        .trigger(availableNow=True)
+        .start()
+        .awaitTermination()
+    )
 
 
 def build_summary(spark: SparkSession) -> dict:
-    """
-    Завдання 6 (15 балів). Serving layer: прочитайте OUTPUT батчем і складіть зведення:
-      {"total_events": int, "n_windows": int, "window_seconds": 30, "by_type": {type: int}}
-    Запишіть його у SUMMARY (json, indent=2, sort_keys=True) і поверніть як dict.
-    """
-    # TODO
-    raise NotImplementedError
+    df = spark.read.parquet(OUTPUT)
+
+    summary = {
+        "total_events": df.agg(F.sum("event_count")).first()[0],
+        "n_windows": df.select("window_start", "window_end").distinct().count(),
+        "window_seconds": 30,
+        "by_type": {
+            row["event_type"]: row["total"]
+            for row in (
+                df.groupBy("event_type")
+                .agg(F.sum("event_count").alias("total"))
+                .collect()
+            )
+        },
+    }
+
+    summary["total_events"] = int(summary["total_events"])
+    summary["n_windows"] = int(summary["n_windows"])
+
+    os.makedirs(os.path.dirname(SUMMARY), exist_ok=True)
+
+    with open(SUMMARY, "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2, sort_keys=True)
+
+    return summary
 
 
 def main() -> None:
