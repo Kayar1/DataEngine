@@ -1,7 +1,68 @@
--- silver.events — ЕТАП 2. Grain: одна подія (event_id). SPEC.md, розділ 4.2.
---   * incremental, unique_key='event_id', delete+insert; межа — high_watermark() за _ingested_at
---   * відкинути source='loadtest' і рядки без occurred_at / ride_id
---   * один рядок на event_id (найраніший _ingested_at, за рівності — _source_file)
---   * payload text -> jsonb; occurred_date = utc_date(occurred_at); _loaded_at = run_started_at
+-- silver.events
+-- Grain: одна подія (event_id)
 
-{{ exceptions.raise_compiler_error("TODO: реалізуйте модель events (див. SPEC.md)") }}
+{{ config(
+    materialized='incremental',
+    incremental_strategy='delete+insert',
+    unique_key='event_id'
+) }}
+
+with source_events as (
+
+    select
+        event_id,
+        event_type,
+        ride_id,
+        occurred_at,
+        source,
+        payload,
+        _source_file,
+        _ingested_at
+    from {{ source('bronze', 'raw_events') }}
+
+    where source <> 'loadtest'
+      and occurred_at is not null
+      and ride_id is not null
+
+      {% if is_incremental() %}
+      and _ingested_at > {{ high_watermark('_ingested_at') }}
+      {% endif %}
+
+),
+
+deduplicated as (
+
+    select
+        event_id,
+        event_type,
+        ride_id,
+        occurred_at,
+        source,
+        payload,
+        _source_file,
+        _ingested_at
+    from (
+        select
+            *,
+            row_number() over (
+                partition by event_id
+                order by _ingested_at, _source_file
+            ) as rn
+        from source_events
+    ) ranked
+    where rn = 1
+
+)
+
+select
+    event_id,
+    event_type,
+    ride_id,
+    occurred_at,
+    source,
+    {{ utc_date('occurred_at') }} as occurred_date,
+    payload::jsonb as payload,
+    _source_file,
+    _ingested_at,
+    '{{ run_started_at }}'::timestamptz as _loaded_at
+from deduplicated
